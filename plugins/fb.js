@@ -54,8 +54,8 @@ cmd(
       }
 
       const { title, sd, hd } = result;
-      const bestQualityUrl = hd || 1080p;
-      const qualityText = hd ? "HD" : "1080p";
+      const bestQualityUrl = hd || sd;
+      const qualityText = hd ? "HD" : "SD";
 
       const desc = `
 Your fb video
