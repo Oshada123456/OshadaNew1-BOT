@@ -3,7 +3,7 @@ const TikTokScraper = require("tiktok-scraper");
 
 cmd(
   {
-    pattern: "tiktok",
+    pattern: "tt",
     react: "🎥",
     desc: "Download TikTok Video (No Watermark)",
     category: "download",
