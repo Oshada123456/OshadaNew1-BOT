@@ -61,7 +61,7 @@ Song downloader
         { quoted: mek }
       );
 
-      const quality = "192";
+      const quality = "320";
       const songData = await ytmp3(url, quality);
 
       let durationParts = data.timestamp.split(":").map(Number);
@@ -70,7 +70,7 @@ Song downloader
           ? durationParts[0] * 3600 + durationParts[1] * 60 + durationParts[2]
           : durationParts[0] * 60 + durationParts[1];
 
-      if (totalSeconds > 1800) {
+      if (totalSeconds > 7200) {
         return reply("⏳ *Sorry, audio files longer than 30 minutes are not supported.*");
       }
 
