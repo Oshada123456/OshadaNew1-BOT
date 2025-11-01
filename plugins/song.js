@@ -61,7 +61,7 @@ Song downloader
         { quoted: mek }
       );
 
-      const quality = "320";
+      const quality = "192";
       const songData = await ytmp3(url, quality);
 
       let durationParts = data.timestamp.split(":").map(Number);
