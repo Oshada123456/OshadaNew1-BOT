@@ -89,7 +89,7 @@ async function connectToWA() {
 
       const up = `Oshi_BOT connected ✅\n\nPREFIX: ${prefix}`;
       await danuwa.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-        image: { url: `https://github.com/DANUWA-MD/DANUWA-MD/blob/main/images/DANUWA-MD.png?raw=true` },
+        image: { url: `https://github.com/Oshada123456/OshadaNew1-BOT/blob/main/images/Picsart_25-04-03_21-30-50-609.jpg?raw=true` },
         caption: up
       });
 
