@@ -17,7 +17,7 @@ function uniqName(prefix = "ytdl") {
 
 cmd(
   {
-    pattern: "ytdl",
+    pattern: "yt",
     react: "⬇️",
     desc: "Download YouTube video or audio. Usage: .ytdl <url> [360|720|1080|audio]",
     category: "download",
