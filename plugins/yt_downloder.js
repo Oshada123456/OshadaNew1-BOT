@@ -7,7 +7,10 @@ const os = require("os");
 const path = require("path");
 const { promisify } = require("util");
 const { pipeline } = require("stream");
-const pump = promisify(pipeline);
+const pump = promisify(pipeline);const ytdl = require("@distube/ytdl-core");
+const fs = require("fs");
+const cookies = fs.existsSync("youtube_cookies.txt") ? { cookies: fs.readFileSync("youtube_cookies.txt", "utf8") } : {};
+
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -37,7 +40,7 @@ cmd({
 
   try {
     reply("⏳ *Downloading audio...*");
-    const info = await ytdl.getInfo(url);
+    const info = await ytdl.getInfo(url, cookies);
     const audioFormat = ytdl.filterFormats(info.formats, "audioonly").sort((a,b)=> (b.audioBitrate||0)-(a.audioBitrate||0))[0];
     const title = info.videoDetails.title.replace(/[\\\/\?%*:|"<>]/g, "_").slice(0, 80);
     const outPath = tmpName("song") + ".mp3";
