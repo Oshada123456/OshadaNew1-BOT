@@ -4,7 +4,7 @@ const fetch = require("node-fetch");
 
 cmd(
   {
-    pattern: "tiktok",
+    pattern: "tt",
     react: "🎥",
     desc: "Download TikTok Video (Best Quality, No Watermark, Redirect Fix)",
     category: "download",
