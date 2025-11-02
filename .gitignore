@@ -1,0 +1,25 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment & sensitive files
+.env
+*.env
+
+# Temporary files
+*.tmp
+*.log
+tmp/
+temp/
+downloads/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Your bot sensitive files
+youtube_cookies.txt
+plugins/youtube_cookies.txt
+cookies.txt
+cookies/
