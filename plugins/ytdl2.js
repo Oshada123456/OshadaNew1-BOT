@@ -1,5 +1,5 @@
 const { cmd, commands } = require("../command");
-const ytdl = require("ytdl-core");
+const ytdl = require("@distube/ytdl-core");
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegPath = require("ffmpeg-static");
 const fetch = require("node-fetch");
