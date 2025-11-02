@@ -7,8 +7,6 @@ const os = require("os");
 const path = require("path");
 const { promisify } = require("util");
 const { pipeline } = require("stream");
-const pump = promisify(pipeline);const ytdl = require("@distube/ytdl-core");
-const fs = require("fs");
 const cookies = fs.existsSync("youtube_cookies.txt") ? { cookies: fs.readFileSync("youtube_cookies.txt", "utf8") } : {};
 
 
