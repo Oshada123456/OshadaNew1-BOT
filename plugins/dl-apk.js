@@ -1,5 +1,17 @@
+// plugins/dl-apk.js
 const axios = require("axios");
-const { malvin } = require("../malvin");
+const path = require("path");
+const fs = require("fs");
+
+let malvin;
+try {
+  // plugin files expected in plugins/ so malvin.js at project root -> ../malvin
+  malvin = require("../malvin");
+} catch (e) {
+  console.error("Failed to require malvin.js - check path. Error:", e);
+  // create a noop to avoid crash if malvin isn't available (so require won't throw further)
+  malvin = () => {};
+}
 
 malvin({
   pattern: "apk",
@@ -11,91 +23,160 @@ malvin({
   filename: __filename
 }, async (conn, mek, m, { from, reply, args }) => {
   try {
-    // Check if the user provided an app name
-    const appName = args.join(" ");
+    const appName = (args || []).join(" ").trim();
     if (!appName) {
-      return reply('Please provide an app name. Example: `.apk whatsapp `');
+      return await safeReply(conn, from, m, 'Please provide an app name. Example: `.apk whatsapp`', reply);
     }
 
-    // Add a reaction to indicate processing
-    await conn.sendMessage(from, { react: { text: '⏳', key: m.key } });
+    // indicate processing (try react or simple text)
+    await safeReactOrText(conn, from, m, '⏳');
 
-    // Prepare the NexOracle API URL
     const apiUrl = `https://api.nexoracle.com/downloader/apk`;
     const params = {
-      apikey: 'free_key@maher_apis', // Replace with your API key if needed
-      q: appName, // App name to search for
+      apikey: process.env.NEXORACLE_API_KEY || 'free_key@maher_apis', // use env var if set
+      q: appName,
     };
 
-    // Call the NexOracle API using GET
-    const response = await axios.get(apiUrl, { params });
+    // set timeout and validate status
+    const response = await axios.get(apiUrl, { params, timeout: 15000, validateStatus: s => s < 500 });
 
-    // Check if the API response is valid
-    if (!response.data || response.data.status !== 200 || !response.data.result) {
-      return reply('❌ Unable to find the APK. Please try again later.');
+    if (!response || !response.data) {
+      console.error("Empty response from NexOracle", response && response.status);
+      return await safeReply(conn, from, m, '❌ Unable to find the APK. API returned empty response.', reply);
     }
 
-    // Extract the APK details
-    const { name, lastup, package, size, icon, dllink } = response.data.result;
-
-    // Send a message with the app thumbnail and "Downloading..." text
-    await conn.sendMessage(from, {
-      image: { url: icon }, // App icon as thumbnail
-      caption: `📦 *Downloading ${name}... Please wait.*`,
-      contextInfo: {
-        mentionedJid: [m.sender],
-        forwardingScore: 999,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-          newsletterJid: '120363420656466131@newsletter',
-          newsletterName: '『『 LUCKY-XD 』』',
-          serverMessageId: 143
-        }
-      }
-    }, { quoted: mek });
-
-    // Download the APK file
-    const apkResponse = await axios.get(dllink, { responseType: 'arraybuffer' });
-    if (!apkResponse.data) {
-      return reply('❌ Failed to download the APK. Please try again later.');
+    // Support different response shapes
+    const result = response.data.result || (response.data.data && response.data.data.result) || null;
+    if (!result) {
+      console.error("No result field in API response:", response.data);
+      return await safeReply(conn, from, m, '❌ Unable to find the APK. No result returned by API.', reply);
     }
 
-    // Prepare the APK file buffer
-    const apkBuffer = Buffer.from(apkResponse.data, 'binary');
+    // try common keys for download link and metadata
+    const name = result.name || result.title || appName;
+    const lastup = result.lastup || result.updated_at || result.last_update || 'Unknown';
+    const packageName = result.package || result.pkg || result.package_name || 'unknown';
+    const size = result.size || result.file_size || 'unknown';
+    const icon = result.icon || result.thumbnail || null;
+    const dllink = result.dllink || result.download || (result.downloads && result.downloads[0]) || null;
 
-    // Prepare the message with APK details
-    const message = `📦 *ᴀᴘᴋ ᴅᴇᴛᴀɪʟs*📦:\n\n` +
-      `🔖 *Nᴀᴍᴇ*: ${name}\n` +
-      `📅 *Lᴀsᴛ ᴜᴘᴅᴀᴛᴇ*: ${lastup}\n` +
-      `📦 *Pᴀᴄᴋᴀɢᴇ*: ${package}\n` +
-      `📏 *Sɪᴢᴇ*: ${size}\n\n` +
-      `> © Powered By Lucky Tech Hub `;
+    if (!dllink) {
+      console.error("No download link found in result:", result);
+      return await safeReply(conn, from, m, '❌ Download link not found for that app. Try a different name.', reply);
+    }
 
-    // Send the APK file as a document
-    await conn.sendMessage(from, {
-      document: apkBuffer,
-      mimetype: 'application/vnd.android.package-archive',
-      fileName: `${name}.apk`,
-      caption: message,
-      contextInfo: {
-        mentionedJid: [m.sender],
-        forwardingScore: 999,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-          newsletterJid: '120363420656466131@newsletter',
-          newsletterName: '『 LUCKY-XD 』 ',
-          serverMessageId: 143
-        }
+    // send thumbnail + "Downloading..." message if icon exists
+    if (icon) {
+      try {
+        await safeSend(conn, from, { image: { url: icon }, caption: `📦 Downloading ${name}... Please wait.` }, { quoted: mek });
+      } catch (e) {
+        // ignore thumb send error, continue
+        console.warn("Failed to send icon thumbnail:", e && e.message);
       }
-    }, { quoted: mek });
+    } else {
+      await safeReply(conn, from, m, `📦 Downloading ${name}... Please wait.`, reply);
+    }
 
-    // Add a reaction to indicate success
-    await conn.sendMessage(from, { react: { text: '✅', key: m.key } });
+    // download APK (with timeout)
+    let apkBuffer;
+    try {
+      const apkResponse = await axios.get(dllink, { responseType: 'arraybuffer', timeout: 60000, maxContentLength: 200 * 1024 * 1024 });
+      if (!apkResponse || !apkResponse.data) throw new Error('Empty APK response');
+      apkBuffer = Buffer.from(apkResponse.data, 'binary');
+    } catch (e) {
+      console.error("Failed to download APK:", e && e.message);
+      return await safeReply(conn, from, m, '❌ Failed to download the APK file. The download URL may be invalid or the file is too large.', reply);
+    }
+
+    // prepare caption with details
+    const message = `📦 *APK DETAILS* 📦\n\n` +
+      `🔖 *Name*: ${name}\n` +
+      `📅 *Last update*: ${lastup}\n` +
+      `📦 *Package*: ${packageName}\n` +
+      `📏 *Size*: ${size}\n\n` +
+      `> © Powered By Lucky Tech Hub`;
+
+    // send as document
+    try {
+      await safeSend(conn, from, {
+        document: apkBuffer,
+        mimetype: 'application/vnd.android.package-archive',
+        fileName: `${sanitizeFileName(name)}.apk`,
+        caption: message
+      }, { quoted: mek });
+    } catch (e) {
+      console.error("Failed to send APK file via safeSend:", e && e.message);
+      // fallback: write to temp file and try to send from file path if connection supports
+      try {
+        const tmpPath = path.join(__dirname, `../tmp/${Date.now()}_${sanitizeFileName(name)}.apk`);
+        fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
+        fs.writeFileSync(tmpPath, apkBuffer);
+        await safeSend(conn, from, { document: fs.createReadStream(tmpPath), fileName: `${sanitizeFileName(name)}.apk`, mimetype: 'application/vnd.android.package-archive', caption: message }, { quoted: mek });
+        // delete temp file after short delay
+        setTimeout(() => { try { fs.unlinkSync(tmpPath); } catch (e) {} }, 10_000);
+      } catch (e2) {
+        console.error("Fallback send (file) also failed:", e2 && e2.message);
+        await safeReply(conn, from, m, '❌ Failed to send the APK file to the chat. The file might be too large or the bot cannot send files.', reply);
+      }
+    }
+
+    // indicate success
+    await safeReactOrText(conn, from, m, '✅');
   } catch (error) {
-    console.error('Error fetching APK details:', error);
-    reply('❌ Unable to fetch APK details. Please try again later.');
-
-    // Add a reaction to indicate failure
-    await conn.sendMessage(from, { react: { text: '❌', key: m.key } });
+    console.error('Error in dl-apk plugin:', error && (error.stack || error.message || error));
+    try { await safeReply(conn, from, m, '❌ Unable to fetch APK details. Please try again later.', reply); } catch(e){}
+    try { await safeReactOrText(conn, from, m, '❌'); } catch(e){}
   }
 });
+
+/**
+ * Helpers
+ */
+
+function sanitizeFileName(name = '') {
+  return name.replace(/[^a-z0-9_\-\. ]/gi, '_').slice(0, 120);
+}
+
+async function safeReply(conn, from, m, text, replyFn) {
+  // if plugin passed a reply function, use it
+  if (typeof replyFn === 'function') {
+    try { await replyFn(text); return; } catch(e){}
+  }
+  // try conn.sendMessage simple text variant
+  try {
+    await conn.sendMessage(from, { text });
+    return;
+  } catch (e) {
+    // last resort: log
+    console.error("safeReply failed:", e && e.message);
+  }
+}
+
+async function safeSend(conn, from, payload, options = {}) {
+  // try common signature: conn.sendMessage(jid, content, options)
+  try {
+    if (typeof conn.sendMessage === 'function') {
+      return await conn.sendMessage(from, payload, options);
+    }
+  } catch (e) {
+    // try alternate signature: conn.sendMessage(jid, content)
+    try {
+      return await conn.sendMessage(from, payload);
+    } catch (e2) {
+      console.warn("conn.sendMessage attempts failed:", e && e.message, e2 && e2.message);
+    }
+  }
+
+  // try conn.sendFile if exists (some libs)
+  try {
+    if (typeof conn.sendFile === 'function') {
+      // sendFile(jid, file, filename, caption, quoted)
+      const doc = payload.document || payload.image || payload.video || payload.audio;
+      if (doc) {
+        // if doc is buffer, write temp
+        if (Buffer.isBuffer(doc)) {
+          const tmpPath = path.join(__dirname, `../tmp/${Date.now()}_file`);
+          fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
+          fs.writeFileSync(tmpPath, doc);
+          const filename = payload.fileName || 'file';
+          return await conn.sendFile(from, tmp
