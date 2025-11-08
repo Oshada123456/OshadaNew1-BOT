@@ -3,13 +3,19 @@ const axios = require("axios");
 const path = require("path");
 const fs = require("fs");
 
-let malvin;
+let malvinFunc;
 try {
-  malvin = require("../malvin");
+  const malvinModule = require("../malvin");
+  malvinFunc = malvinModule.malvin; // object eke malvin property function ekata
+  if (typeof malvinFunc !== 'function') {
+    console.warn("malvin is not a function, creating noop.");
+    malvinFunc = (config, cb) => {};
+  }
 } catch (e) {
   console.error("Failed to require malvin.js - check path. Error:", e);
-  malvin = () => {};
+  malvinFunc = (config, cb) => {};
 }
+
 
 malvin({
   pattern: "apk",
