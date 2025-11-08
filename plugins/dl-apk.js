@@ -26,6 +26,7 @@ malvin({
   use: ".apk <app name>",
   filename: __filename
 }, async (conn, mek, m, { from, reply, args }) => {
+
   try {
     const appName = (args || []).join(" ").trim();
     if (!appName) {
