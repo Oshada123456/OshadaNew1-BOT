@@ -8,12 +8,16 @@ const {
   Browsers
 } = require('@whiskeysockets/baileys');
 
+const { loadPlugins, handleMessage } = require('./malvin');
 const fs = require('fs');
 const P = require('pino');
 const express = require('express');
 const axios = require('axios');
 const path = require('path');
 const qrcode = require('qrcode-terminal');
+// Load all command plugins
+loadPlugins('./plugins');
+
 
 const config = require('./config');
 const { sms, downloadMediaMessage } = require('./lib/msg');
