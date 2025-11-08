@@ -1,5 +1,5 @@
 const axios = require("axios");
-const { malvin } = require("../malvin");
+const { malvin } = require("./malvin");
 
 malvin({
   pattern: "apk",
