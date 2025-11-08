@@ -30,6 +30,15 @@ const prefix = '.';
 const ownerNumber = ['94788345811'];
 const credsPath = path.join(__dirname, '/auth_info_baileys/creds.json');
 
+const { loadPlugins, handleMessage } = require('./malvin');
+loadPlugins('./plugins');
+
+// Example (Baileys event):
+client.on('messages.upsert', async (m) => {
+  await handleMessage(client, m);
+});
+
+
 async function ensureSessionFile() {
   if (!fs.existsSync(credsPath)) {
     if (!config.SESSION_ID) {
