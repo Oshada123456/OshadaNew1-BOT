@@ -179,4 +179,4 @@ async function safeSend(conn, from, payload, options = {}) {
           fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
           fs.writeFileSync(tmpPath, doc);
           const filename = payload.fileName || 'file';
-          return await conn.sendFile(from, tmp
+          return await conn.sendFile(from, tmpPath, filename, payload.caption || '', options.quoted).finally(() => {   try { fs.unlinkSync(tmpPath); } catch (e) {} });
