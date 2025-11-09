@@ -8,21 +8,15 @@ const {
   Browsers
 } = require('@whiskeysockets/baileys');
 
-
 const fs = require('fs');
 const P = require('pino');
 const express = require('express');
-const axios = require('axios');
 const path = require('path');
-const qrcode = require('qrcode-terminal');
-
+const { File } = require('megajs');
 
 const config = require('./config');
-const { sms, downloadMediaMessage } = require('./lib/msg');
-const {
-  getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson
-} = require('./lib/functions');
-const { File } = require('megajs');
+const { sms } = require('./lib/msg');
+const { getGroupAdmins } = require('./lib/functions');
 const { commands, replyHandlers } = require('./command');
 
 const app = express();
@@ -32,7 +26,6 @@ const prefix = '.';
 const ownerNumber = ['94788345811'];
 const credsPath = path.join(__dirname, '/auth_info_baileys/creds.json');
 
-
 async function ensureSessionFile() {
   if (!fs.existsSync(credsPath)) {
     if (!config.SESSION_ID) {
@@ -41,7 +34,6 @@ async function ensureSessionFile() {
     }
 
     console.log("🔄 creds.json not found. Downloading session from MEGA...");
-
     const sessdata = config.SESSION_ID;
     const filer = File.fromURL(`https://mega.nz/file/${sessdata}`);
 
@@ -81,12 +73,27 @@ async function connectToWA() {
     generateHighQualityLinkPreview: true,
   });
 
+  // ✅ Connection update with Bad MAC / session fix
   danuwa.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
+
     if (connection === 'close') {
-      if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-        connectToWA();
+      const reason = lastDisconnect?.error?.output?.statusCode;
+      console.log("Connection closed. Reason:", reason);
+
+      // Bad MAC / logged out / 401 → delete session & reconnect
+      if (reason === DisconnectReason.badSession || reason === DisconnectReason.loggedOut || reason === 401) {
+        console.log('❌ Session is bad or logged out. Deleting session and reconnecting...');
+        try {
+          fs.rmSync(path.join(__dirname, '/auth_info_baileys/'), { recursive: true, force: true });
+        } catch (e) {
+          console.error('Error deleting session folder:', e);
+        }
+        return connectToWA();
       }
+
+      console.log('Reconnecting...');
+      connectToWA();
     } else if (connection === 'open') {
       console.log('✅ Oshi_BOT connected to WhatsApp');
 
@@ -106,6 +113,7 @@ async function connectToWA() {
 
   danuwa.ev.on('creds.update', saveCreds);
 
+  // ✅ Message upsert
   danuwa.ev.on('messages.upsert', async ({ messages }) => {
     for (const msg of messages) {
       if (msg.messageStubType === 68) {
@@ -146,6 +154,7 @@ async function connectToWA() {
 
     const reply = (text) => danuwa.sendMessage(from, { text }, { quoted: mek });
 
+    // Commands handler
     if (isCmd) {
       const cmd = commands.find((c) => c.pattern === commandName || (c.alias && c.alias.includes(commandName)));
       if (cmd) {
@@ -163,6 +172,7 @@ async function connectToWA() {
       }
     }
 
+    // Reply handlers
     const replyText = body;
     for (const handler of replyHandlers) {
       if (handler.filter(replyText, { sender, message: mek })) {
