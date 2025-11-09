@@ -8,7 +8,7 @@ const {
   Browsers
 } = require('@whiskeysockets/baileys');
 
-const { loadPlugins, handleMessage } = require('./malvin');
+
 const fs = require('fs');
 const P = require('pino');
 const express = require('express');
