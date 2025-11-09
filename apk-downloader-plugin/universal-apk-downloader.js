@@ -147,6 +147,12 @@ async function downloadAnyApk({ queryOrUrl, filename, folder = './downloads' }) 
     } catch (e) { /* ignore and continue */ }
   }
 
+  
+  if (!apkLink) {
+  console.log("No APK link found, trying next source...");
+  continue;
+}
+
   if (!found) throw new Error('Unable to find APK link from sources');
 
   const finalUrl = found.apkUrl;
