@@ -15,8 +15,6 @@ const express = require('express');
 const axios = require('axios');
 const path = require('path');
 const qrcode = require('qrcode-terminal');
-// Load all command plugins
-loadPlugins('./plugins');
 
 
 const config = require('./config');
