@@ -148,10 +148,15 @@ async function downloadAnyApk({ queryOrUrl, filename, folder = './downloads' }) 
   }
 
   
+for (const source of sources) {
+  const apkLink = await fetchApkLink(source, query);
   if (!apkLink) {
-  console.log("No APK link found, trying next source...");
-  continue;
+    console.log("No APK link found, trying next source...");
+    continue; // ✅ මෙතන OK, මේක loop එකක් ඇතුලේ
+  }
+  return apkLink;
 }
+
 
   if (!found) throw new Error('Unable to find APK link from sources');
 
